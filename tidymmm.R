@@ -62,10 +62,8 @@ built_formula<-create_formula()
 #create bounds based on variable control
 boundaries<-make_bound_statements()
 
-#generate list of formula for stan macro/ulam
-formula_list<-create_ulam_list(prior_controls=var_controls, model_formula=built_formula)
 
-
+formula_list2<-create_ulam_list(prior_controls=var_controls, model_formula=built_formula)
 # ulam_list<-c(priors_for_random_ints,priors_for_fixed,user_defined_priors,prior_on_a0,prior_on_big_sigma,prior_on_store_int_sigma,main_model_formula)
 # tune_spec<-bayesian(family='gaussian',engine='brms',mode='regression',chains=4,iter=4000,
 #                     stanvars = if(exists('inject_this_for_signs')) inject_this_for_signs else NULL,
@@ -201,7 +199,7 @@ data3<-data3 %>% select(-store,-product)
 
 
 
-rethinking_results<-ulam(formula_list,
+rethinking_results<-ulam(formula_list2,
                chains=4,iter=4000,
                thin=1,
                data=data3,

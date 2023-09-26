@@ -235,32 +235,34 @@ create_ulam_list<-function(prior_controls=var_controls, model_formula=built_form
                                        paste(paste0(random_ints,"_int[",random_ints,"_id]"),collapse='+'),
                                        '')
   
-  number_of_fixed<-number_of_terms-length(rand_ints_formula_for_ulam)
+  number_of_fixed<-number_of_terms-length(rand_ints_formula_for_ulam[rand_ints_formula_for_ulam!=''])
   
   big_model_list<-vector('list')
   included_terms=0
   start_term=1
   last_end_term=15
   iter_of_big_model=1
-  while(start_term<number_of_terms){
+  while(start_term<=number_of_fixed){
     
     this_end_term=min(last_end_term,number_of_fixed)
     if(iter_of_big_model==1){
-      big_model_list[[iter_of_big_model]]<- parse(text=paste('big_model <-',paste(fixed_coefs[start_term:this_end_term],
-                                                                                  fixed_terms[start_term:this_end_term],sep='*',collapse='+')))
+      big_model_list[[iter_of_big_model]]<- paste('big_model <-',paste(fixed_coefs[start_term:this_end_term],
+                                                                                  fixed_terms[start_term:this_end_term],sep='*',collapse='+'))
     }
     else{
-      big_model_list[[iter_of_big_model]]<- parse(text=paste('big_model <- big_model + ',paste(fixed_coefs[start_term:this_end_term],
-                                                                                               fixed_terms[start_term:this_end_term],sep='*',collapse='+')))
+      big_model_list[[iter_of_big_model]]<-paste('big_model <- big_model + ',paste(fixed_coefs[start_term:this_end_term],
+                                                                                               fixed_terms[start_term:this_end_term],sep='*',collapse='+'))
     }
     start_term=this_end_term+1
     last_end_term=this_end_term+15
     iter_of_big_model=iter_of_big_model+1
   }
-  big_model_list[[iter_of_big_model]]<-parse(text=paste('big_model <- big_model +',rand_ints_formula_for_ulam,'+a0'))
+  if(rand_ints_formula_for_ulam!='')
+  {big_model_list[[iter_of_big_model]]<-paste('big_model <- big_model','a0',rand_ints_formula_for_ulam,sep='+')}else
+  {big_model_list[[iter_of_big_model]]<-paste('big_model <- big_model','a0',sep='+')}
   
-  
-  formula_list<-c(main_model_formula,rev(big_model_list),priors_for_random_ints,priors_for_fixed,user_defined_priors,prior_on_a0,prior_on_big_sigma,prior_on_store_int_sigma)
+  big_model_list_parsed<-sapply(big_model_list,function(x) parse(text=x))
+  formula_list<-c(main_model_formula,rev(big_model_list_parsed),priors_for_random_ints,priors_for_fixed,user_defined_priors,prior_on_a0,prior_on_big_sigma,prior_on_store_int_sigma)
   
   class(formula_list)<-'list'
   return(formula_list)
@@ -270,22 +272,21 @@ create_ulam_list<-function(prior_controls=var_controls, model_formula=built_form
 
 # create_ulam_list()
 
-# lotsa_vars<-paste0('x',1:60)
+# lotsa_vars<-paste0('x',1:8)
 # new_x<-replicate(60,runif(nrow(data1))) %>% as_tibble()
 # names(new_x)<-lotsa_vars
 # 
 # 
 # data_for_lotsa_vars<-cbind(data1 ,new_x)
-# recipea<-recipe(head(data_for_lotsa_vars,n=1) ) 
+# recipea<-recipe(head(data_for_lotsa_vars,n=1) )
 # 
-# recipeb<-recipea %>% bulk_update_role() %>% bulk_add_role() 
+# recipeb<-recipea %>% bulk_update_role() %>% bulk_add_role()
 # 
 # recipeb<-recipeb %>% add_steps_media() %>%  step_select(-has_role('postprocess'))
-# ##TODO: test all variations of tune vs fixed -- test alpha, e.g.
-# 
+
 # 
 # recipec <-recipeb %>% step_mutate(week=as.numeric(week)-19247.65) %>%# step_center(week) %>%
-#   update_role(c(sin1,sin2,sin3,cos1,cos2,cos3),new_role='time') %>% 
+#   update_role(c(sin1,sin2,sin3,cos1,cos2,cos3),new_role='time') %>%
 #   add_role(c(sin1,sin2,sin3,cos1,cos2,cos3),new_role='predictor')
 # recipec<-recipec %>% update_role(starts_with('x'),new_role='predictor')
 # 
