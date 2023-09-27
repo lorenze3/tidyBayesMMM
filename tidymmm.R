@@ -40,7 +40,7 @@ data1<-data1 %>%   as_tibble()  %>%
 
 #TODO: write function to perform checkcs on control file: 1) 1 outcome 2) role and role 2 assignment checks 3)
 
-recipe3<-create_recipe(data_to_use = data1,adding_trend = get_control("add"))
+recipe3<-create_recipe(data_to_use = data1,adding_trend = get_control("add_trend"))
 #build formula to match config file and dataset
 built_formula<-create_formula()
 
