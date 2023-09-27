@@ -141,22 +141,6 @@ ggplot(data4 ,aes(x=sales,y=hat,color=store_id))+
   ggtitle("Predicted vs Actual",subtitle="store 170 looks a bit off . . .")
 
 
-
-#get decomps (assume linear model)
-get_decomps_linear<-function(modeled_data=data3,model_coefs=rethinking_results@coef,
-                             predictors=get_predictors_vector(recipe3)){
-  #for now, ignore [bracket] codefs
-  model_coefs<-model_coefs[names(model_coefs) %in% paste0("b_",predictors)]
-  #order them by final_predictors order
-  model_coefs<-model_coefs[order(factor(names(model_coefs),levels=paste0("b_",predictors)))]
-  matrix_data<-modeled_data %>% select(all_of(predictors) )%>% as.matrix()
-  for (i in 1:nrow(matrix_data)){
-    matrix_data[i,]<-matrix_data[i,]*model_coefs
-  }
-  decomps<-as_tibble(matrix_data)
-  names(decomps)<-predictors
-  return(decomps)
-}
 decomps<-get_decomps_linear() 
 
 #plot decomp
