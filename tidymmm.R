@@ -1,4 +1,5 @@
-#TODO: zip up the tuning parameter ranges into a function
+#TODO: figure out what to do about having the tuning or not in a script -- it blocks
+# some of the script flow around lmer preds . .. probably don't need that?
 #TODO: reshape this as an example script
 #TODO: put more of the tuning steps inside the if tune this time frame -- make a function?
 #TODO: create response curves from final model results
@@ -20,7 +21,7 @@ workflow_controls<-readxl::read_xlsx(control_file,"workflow") %>% select(-desc)
 tune_this_time<-get_control('tune_this_time')
 
 #read data and get names right;
-data1<-data.table::fread("example.csv") %>% rename_columns_per_controls()
+data1<-data.table::fread("example2.csv") %>% mutate(week=as.Date(week,"%m/%d/%Y"))%>% rename_columns_per_controls()
   
 # read_feather('leads_location_3_product_1_event_3.feather') %>% 
 data1<-data1 %>%   as_tibble()  %>% 
@@ -40,7 +41,7 @@ data1<-data1 %>%   as_tibble()  %>%
 
 #TODO: write function to perform checkcs on control file: 1) 1 outcome 2) role and role 2 assignment checks 3)
 
-recipe3<-create_recipe(data_to_use = data1,adding_trend = get_control("add_trend"))
+recipe3<-create_recipe(data_to_use = data1)#,adding_trend = get_control("add_trend"))
 #build formula to match config file and dataset
 built_formula<-create_formula()
 
@@ -58,100 +59,20 @@ formula_list2<-create_ulam_list(prior_controls=var_controls, model_formula=built
 #                     prior = if(exists('priors_to_add'))priors_to_add  else NULL)
 
 
+use_these_hypers<-tune_or_fetch_hyperparameters(tune_this_time,
+                                                saved_parameter_RDS='best_hypers_lmer.RDS',
+                                                recipe_to_use=recipe3,
+                                        model_formula=built_formula,
+                                        data_set=data1,control_ranges=transform_controls)
 
-if(rand_int_formula==""){tune_spec<-linear_reg(engine='lm')} else{
-  tune_spec<-linear_reg(engine='lmer')}
-#  hardhat::extract_parameter_set_dials(reg_wf)%>% finalize(data1) 
-#need to build a formula with random effects specs for stan_glmer
-
-
-mmm_wf<-workflow() %>%  add_recipe(recipe3) %>% 
-  add_model(tune_spec,formula=as.formula(built_formula)) 
-
-# #testing if stan spec is rigth:
-# best_mmm<-finalize_workflow(mmm_wf,final_hypers)
-# 
-# fit(best_mmm,data1)
-
-
-#going to stratfiy on store to make sure time series terms aren't stupid . . . ?
-folds<-vfold_cv(data1,v=5,strata=store,pool=0.001)
-
-#try to tune .  . . fingers crossed!
-
-#get parameters (if tunable methods correctly working this will be all that's needed) 
-tune_these_parms<-extract_parameter_set_dials(mmm_wf) #will have default ranges
-
-#get ranges from transform_controls
-gamma_ranges<-transform_controls %>%rowwise() %>%  mutate(dial_id=paste0(role,"_saturation_speed")) %>% 
-  mutate(new_range=map2(list(saturation_speed_low),list(saturation_speed_high),~c(.x,.y)),
-         dial_func='saturation_speed') %>% select(dial_id,new_range,dial_func)
-
-alpha_ranges<-transform_controls %>%rowwise() %>%  mutate(dial_id=paste0(role,"_asymptote")) %>% 
-  mutate(new_range=map2(list(asymptote_low),list(asymptote_high),~c(.x,.y)),dial_func='asymptote') %>% select(dial_id,new_range,dial_func)
-
-retention_ranges<-transform_controls %>%rowwise() %>%  mutate(dial_id=paste0(role,"_retention")) %>% 
-  mutate(new_range=map2(list(retention_low),list(retention_high),~c(.x,.y)),dial_func='retention') %>% select(dial_id,new_range,dial_func)
-
-all_transform_ranges<-rbind(gamma_ranges,alpha_ranges,retention_ranges) 
-
-update_range_from_control<-function(parameter_set,controls){
-  for(i in 1:length(parameter_set$id)){
-    parameter_set$object[i][[1]]<-do.call(
-      unlist(all_transform_ranges[all_transform_ranges$dial_id==parameter_set$id[i],'dial_func']),
-      list(range=unlist(all_transform_ranges[all_transform_ranges$dial_id==parameter_set$id[i],'new_range']))
-    )
-  }
-  return(parameter_set)
-}
-
-tune_these_parms<-update_range_from_control(tune_these_parms,all_transform_ranges)
-
-
-
-if(tune_this_time){
-
-  #create cluster handle
-  # this_cl<-parallel::makeCluster(8)
-  #make list of variables to copy to each worker:
-  big_var_list<-c(lsf.str(),'new_quant_param','data1','priors_to_add',
-                  'inject_this_for_signs')
-  vars_that_we_need<-c(big_var_list[big_var_list %in% ls()],'new_quant_param')
-  
-   # parallel::clusterExport(this_cl,varlist=vars_that_we_need)
-   # doParallel::registerDoParallel(this_cl)
-  
-  tuning_trials<- tune_bayes(
-    mmm_wf,
-    resamples = folds,
-    initial=length(tune_these_parms$id)*2,
-    #grid=20,
-    param_info = tune_these_parms
-  )
-  # parallel::stopCluster(this_cl)
-  # final_hypers<-readRDS('best_hypers_b2.RDS')
-  final_hypers3<-select_best(tuning_trials)
-  
-  #see what this looks like
-  best_mmm<-finalize_workflow(mmm_wf ,final_hypers3)  %>% fit(data1 %>% group_by(product,store) %>% arrange(product,store,week))
-  
-  data1<-data1 %>% arrange(store,week) %>% group_by(store)
-  best_mmm<-fit(best_mmm,data1)
-  
-  # 
-  # fit(best_mmm,data1)
-  
-  
-  #saveRDS(best_mmm,'best_mmm_b3.RDS')
-   saveRDS(final_hypers3,'best_hypers_lmer.RDS')
-}
-use_these_hypers<-readRDS('best_hypers_lmer.RDS')
 
 fin_rec_3<-recipe3 %>% finalize_recipe(use_these_hypers) %>% prep()
 new_data_to_fake<-bake(fin_rec_3,data1)
-data1$pred_lmer<-predict(best_mmm %>% extract_fit_engine(),new_data_to_fake)
 
-rsq(data1 %>% ungroup() ,truth = !!outcome,estimate = pred_lmer)
+
+# data1$pred_lmer<-predict(best_mmm %>% extract_fit_engine(),new_data_to_fake)
+# 
+# rsq(data1 %>% ungroup() ,truth = !!outcome,estimate = pred_lmer)
 
 
 #now fit mmm using bayesian (sign constraint and priors and . . .)
@@ -220,6 +141,45 @@ ggplot(data4 ,aes(x=sales,y=hat,color=store_id))+
   ggtitle("Predicted vs Actual",subtitle="store 170 looks a bit off . . .")
 
 
+
+#get decomps (assume linear model)
+get_decomps_linear<-function(modeled_data=data3,model_coefs=rethinking_results@coef,
+                             predictors=get_predictors_vector(recipe3)){
+  #for now, ignore [bracket] codefs
+  model_coefs<-model_coefs[names(model_coefs) %in% paste0("b_",predictors)]
+  #order them by final_predictors order
+  model_coefs<-model_coefs[order(factor(names(model_coefs),levels=paste0("b_",predictors)))]
+  matrix_data<-modeled_data %>% select(all_of(predictors) )%>% as.matrix()
+  for (i in 1:nrow(matrix_data)){
+    matrix_data[i,]<-matrix_data[i,]*model_coefs
+  }
+  decomps<-as_tibble(matrix_data)
+  names(decomps)<-predictors
+  return(decomps)
+}
+decomps<-get_decomps_linear() 
+
+#plot decomp
+fin_pred<-get_predictors_vector(recipe3)
+names(fin_pred)<-NULL
+
+decomps<-get_decomps_linear() %>%rowwise() %>%  mutate(media=sum(c_across(all_of(fin_pred))))
+decomps$week<-data1$week 
+decomps$sales<-data1$sales
+decomps$base<-decomps$sales-decomps$media
+
+
+decomps_natl<-decomps %>% group_by(week) %>% summarise(across(where(is.numeric),sum))
+
+decomps_natl<-decomps_natl %>% pivot_longer(cols=c(-week,-sales,-media))
+
+ggplot(data=decomps_natl,aes(x=week,y=value,fill=name)) + geom_area()+ggthemes::theme_tufte()+
+  ggtitle("Decomposition By Week")+
+  theme(legend.position = 'bottom')
+
+################
+
+
 data1$preds<-data4$hat
 
 natl_plot<-data1  %>% group_by(week) %>% summarise(across(all_of(c('preds','sales','pred_lmer',
@@ -236,22 +196,6 @@ ggplot(natl_plot_long,aes(x=week,y=sales,color=name))+geom_point() +ggthemes::th
   ggtitle("Aggregated Leads, LMER Predicted Leads, and Bayesian Multilevel Leads",
           subtitle = paste0("rsq = ",natl_rsq))+
   guides(color=  guide_legend(title=NULL))+geom_line()
-
-#get decomps (assume linear model)
-get_decomps_linear<-function(modeled_data=data3,model_coefs=rethinking_results@coef){
-  #for now, ignore [bracket] codefs
-  model_coefs<-model_coefs[names(model_coefs) %in% paste0("b_",final_predictors)]
-  #order them by final_predictors order
-  model_coefs<-model_coefs[order(factor(names(model_coefs),levels=paste0("b_",final_predictors)))]
-  matrix_data<-modeled_data %>% select(all_of(final_predictors) )%>% as.matrix()
-  for (i in 1:nrow(matrix_data)){
-    matrix_data[i,]<-matrix_data[i,]*model_coefs
-  }
-  decomps<-as_tibble(matrix_data)
-  names(decomps)<-final_predictors
-  return(decomps)
-}
-decomps<-get_decomps_linear() 
 
 
 #TODO:need to get accurate cost data
@@ -279,23 +223,7 @@ compute_cost_per()
   
 
 
-#plot decomp
-fin_pred<-final_predictors
-names(fin_pred)<-NULL
 
-decomps<-get_decomps_linear() %>%rowwise() %>%  mutate(media=sum(c_across(all_of(fin_pred))))
-decomps$week<-data1$week 
-decomps$sales<-data1$sales
-decomps$base<-decomps$sales-decomps$media
-
-
-decomps_natl<-decomps %>% group_by(week) %>% summarise(across(where(is.numeric),sum))
-
-decomps_natl<-decomps_natl %>% pivot_longer(cols=c(-week,-sales,-media))
-
-ggplot(data=decomps_natl,aes(x=week,y=value,fill=name)) + geom_area()+ggthemes::theme_tufte()+
-  ggtitle("Decomposition By Week")+
-  theme(legend.position = 'bottom')
 
 #changed to half cauchy sigma prior & turn off cmdstan
 # saveRDS(rethinking_results,'ulam_fit.RDS')
