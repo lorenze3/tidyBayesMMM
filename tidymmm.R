@@ -1,4 +1,8 @@
-#additive ridge regression with adstock and hill function transformations on media variables
+#TODO: zip up the tuning parameter ranges into a function
+#TODO: reshape this as an example script
+#TODO: put more of the tuning steps inside the if tune this time frame -- make a function?
+#TODO: create response curves from final model results
+
 #suitable for use with bayeisan tuning methods
 setwd('C:\\Users\\loren\\Documents\\R\\tidymmm')
 librarian::shelf(tidymodels,tune,recipes,multilevelmod,tidyverse,arrow,workflowsets,rethinking,rstan)
@@ -18,9 +22,6 @@ tune_this_time<-get_control('tune_this_time')
 #read data and get names right;
 data1<-data.table::fread("example.csv") %>% rename_columns_per_controls()
   
-
-
-
 # read_feather('leads_location_3_product_1_event_3.feather') %>% 
 data1<-data1 %>%   as_tibble()  %>% 
   mutate(across(c(product),as.factor)) %>% group_by(product,store) %>% arrange(product,store,week) %>% 
@@ -39,23 +40,7 @@ data1<-data1 %>%   as_tibble()  %>%
 
 #TODO: write function to perform checkcs on control file: 1) 1 outcome 2) role and role 2 assignment checks 3)
 
-
-
-#start recipe by assigning roles
-#  small data is good, going to need to loop over recipe repeatedly, lots of internal copying
-recipe0<-recipe(head(data1,n=1) ) 
-
-recipe1<-recipe0 %>% bulk_update_role() %>% bulk_add_role() 
-
-recipe2<-recipe1 %>% add_steps_media() %>%  step_select(-has_role('postprocess'))
-##TODO: test all variations of tune vs fixed -- test alpha, e.g.
-
-
-recipe3 <-recipe2 %>% step_mutate(week=as.numeric(week)-19247.65) %>%# step_center(week) %>%
-  update_role(c(sin1,sin2,sin3,cos1,cos2,cos3),new_role='time') %>% 
-  add_role(c(sin1,sin2,sin3,cos1,cos2,cos3),new_role='predictor')
-
-
+recipe3<-create_recipe(data_to_use = data1,adding_trend = get_control("add"))
 #build formula to match config file and dataset
 built_formula<-create_formula()
 
@@ -64,13 +49,15 @@ boundaries<-make_bound_statements()
 
 
 formula_list2<-create_ulam_list(prior_controls=var_controls, model_formula=built_formula)
-# ulam_list<-c(priors_for_random_ints,priors_for_fixed,user_defined_priors,prior_on_a0,prior_on_big_sigma,prior_on_store_int_sigma,main_model_formula)
+
 # tune_spec<-bayesian(family='gaussian',engine='brms',mode='regression',chains=4,iter=4000,
 #                     stanvars = if(exists('inject_this_for_signs')) inject_this_for_signs else NULL,
 #                     #save_model = 'mmm stan code.stan',
 #                     init=0,
 #                     algorithm = 'sampling',
 #                     prior = if(exists('priors_to_add'))priors_to_add  else NULL)
+
+
 
 if(rand_int_formula==""){tune_spec<-linear_reg(engine='lm')} else{
   tune_spec<-linear_reg(engine='lmer')}
@@ -213,24 +200,15 @@ rethinking_results<-ulam(formula_list2,
                messages=F
                )
 
-model_text<-if (is.list(rethinking_results)){rethinking_results$model}else{rethinking_results@model}
-fileConn<-file("ulam stan.stan")
-writeLines(model_text, fileConn)  
-close(fileConn)
+# model_text<-if (is.list(rethinking_results)){rethinking_results$model}else{rethinking_results@model}
+# fileConn<-file("ulam stan.stan")
+# writeLines(model_text, fileConn)
+# close(fileConn)
 
 data4<-data3
 
-predict.ulam<-function(ulamobj,new_data,n=1000,reduce=T,conf=.95){
- link_output<-link(ulamobj,new_data=new_data,n=n)
- if(reduce){
-   preds<-colMeans(link_output)
-   low_conf<-apply(link_output,2,quantile,1-conf)
-   high_conf<-apply(link_output,2,quantile,conf)
-   pred_output<-cbind(preds,low_conf,high_conf)
-   colnames(pred_output)<-c('pred',paste0('pred_lower_',conf),paste0('pred_upper_',conf))
- }
- return(pred_output)
-}
+
+
 pp<-predict(rethinking_results,data4)
 
 data4$hat<-pp[,1]  #colMeans(link(rethinking_results,data4)$big_model)
@@ -274,6 +252,8 @@ get_decomps_linear<-function(modeled_data=data3,model_coefs=rethinking_results@c
   return(decomps)
 }
 decomps<-get_decomps_linear() 
+
+
 #TODO:need to get accurate cost data
 #media0 %>% filter(str_starts(event,"Camping World\\|\\|Facebook"),week>="2022-01-01",week<='2023-06-01') %>% summarise(sum(spend))
 costs<-fread('costs_event_level_3.csv')
@@ -305,16 +285,16 @@ names(fin_pred)<-NULL
 
 decomps<-get_decomps_linear() %>%rowwise() %>%  mutate(media=sum(c_across(all_of(fin_pred))))
 decomps$week<-data1$week 
-decomps$leads<-data1$leads
-decomps$base<-decomps$leads-decomps$media
+decomps$sales<-data1$sales
+decomps$base<-decomps$sales-decomps$media
 
 
 decomps_natl<-decomps %>% group_by(week) %>% summarise(across(where(is.numeric),sum))
 
-decomps_natl<-decomps_natl %>% pivot_longer(cols=c(-week,-leads,-media))
+decomps_natl<-decomps_natl %>% pivot_longer(cols=c(-week,-sales,-media))
 
 ggplot(data=decomps_natl,aes(x=week,y=value,fill=name)) + geom_area()+ggthemes::theme_tufte()+
-  ggtitle("Leads Decomposition By Week",subtitle="no one believes taboola is this good")+
+  ggtitle("Decomposition By Week")+
   theme(legend.position = 'bottom')
 
 #changed to half cauchy sigma prior & turn off cmdstan

@@ -113,7 +113,7 @@ make_bound_statements<-function(variable_controls=var_controls){
   bounded_coefs<-variable_controls %>% filter(!is.na(sign)) %>% rowwise() %>% mutate(
     bound_statement =list(ifelse(sign %in% c('>=0','>0','>','+'),'lower=0',
                                  ifelse(sign %in% c('<=0','<0','<','-'),'upper=0',sign))),
-    name_for_list=paste0('b_',varname)
+    name_for_list=ifelse(tolower(role)=='outcome',varname,paste0('b_',varname))
   )
   list_of_bounds<-bounded_coefs$bound_statement
   names(list_of_bounds)<-bounded_coefs$name_for_list
@@ -246,11 +246,11 @@ create_ulam_list<-function(prior_controls=var_controls, model_formula=built_form
     
     this_end_term=min(last_end_term,number_of_fixed)
     if(iter_of_big_model==1){
-      big_model_list[[iter_of_big_model]]<- paste('big_model <-',paste(fixed_coefs[start_term:this_end_term],
+      big_model_list[[iter_of_big_model]]<- paste(paste0('big_model_',iter_of_big_model,' <-'),paste(fixed_coefs[start_term:this_end_term],
                                                                                   fixed_terms[start_term:this_end_term],sep='*',collapse='+'))
     }
     else{
-      big_model_list[[iter_of_big_model]]<-paste('big_model <- big_model + ',paste(fixed_coefs[start_term:this_end_term],
+      big_model_list[[iter_of_big_model]]<-paste(paste0('big_model_',iter_of_big_model,' <- big_model_',iter_of_big_model-1,' + '),paste(fixed_coefs[start_term:this_end_term],
                                                                                                fixed_terms[start_term:this_end_term],sep='*',collapse='+'))
     }
     start_term=this_end_term+1
@@ -258,8 +258,8 @@ create_ulam_list<-function(prior_controls=var_controls, model_formula=built_form
     iter_of_big_model=iter_of_big_model+1
   }
   if(rand_ints_formula_for_ulam!='')
-  {big_model_list[[iter_of_big_model]]<-paste('big_model <- big_model','a0',rand_ints_formula_for_ulam,sep='+')}else
-  {big_model_list[[iter_of_big_model]]<-paste('big_model <- big_model','a0',sep='+')}
+  {big_model_list[[iter_of_big_model]]<-paste(paste0('big_model <- big_model_',iter_of_big_model-1),'a0',rand_ints_formula_for_ulam,sep='+')}else
+  {big_model_list[[iter_of_big_model]]<-paste(paste0('big_model <- big_model_',iter_of_big_model-1),'a0',sep='+')}
   
   big_model_list_parsed<-sapply(big_model_list,function(x) parse(text=x))
   formula_list<-c(main_model_formula,rev(big_model_list_parsed),priors_for_random_ints,priors_for_fixed,user_defined_priors,prior_on_a0,prior_on_big_sigma,prior_on_store_int_sigma)
@@ -293,3 +293,45 @@ create_ulam_list<-function(prior_controls=var_controls, model_formula=built_form
 # formula_with_lotsa_vars<-create_formula(recipec)
 # create_ulam_list(model_formula=formula_with_lotsa_vars)
 
+predict.ulam<-function(ulamobj,new_data,n=1000,reduce=T,conf=.95){
+  link_output<-link(ulamobj,new_data=new_data,n=n)$big_model
+  if(reduce){
+    preds<-colMeans(link_output)
+    low_conf<-apply(link_output,2,quantile,1-conf)
+    high_conf<-apply(link_output,2,quantile,conf)
+    pred_output<-cbind(preds,low_conf,high_conf)
+    colnames(pred_output)<-c('pred',paste0('pred_lower_',conf),paste0('pred_upper_',conf))
+  }
+  return(pred_output)
+}
+
+
+
+create_recipe<-function(data_to_use=data1,vc=var_controls,adding_trend=TRUE){
+  #start recipe by assigning roles
+  #  small data is good, going to need to loop over recipe repeatedly, lots of internal copying
+  
+  if(adding_trend){
+    #identifyt he time variable and flag if more than 1
+    vc %>% filter(role2=='trend',role=='predictor') %>% select(varname) %>% unlist()->trend_vars
+    if(length(trend_vars)>1){stop('control file asks to add a centered trend but two variables are defined as time predictors.\nCheck the variables tab for role2="trend", role="predictor" and make sure only a single variable is listed' )}
+    column_to_change<-data_to_use %>%ungroup() %>%  select(!!trend_vars) %>% unlist() %>% as.numeric()
+    data_to_use[trend_vars]<-column_to_change
+  }
+  recipe0<-recipe(head(data_to_use,n=1) ) 
+  
+  recipe1<-recipe0 %>% bulk_update_role() %>% bulk_add_role() 
+  if(adding_trend){
+    recipe1<-recipe1 %>% step_center(has_role='trend')
+  }else{
+    #this will remove the trend term from forumals down stream
+    recipe1<-recipe1 %>% update_role(has_role('trend'),new_role='time',old_role='trend') 
+  }
+  recipe2<-recipe1 %>% add_steps_media() %>%  step_select(-has_role('postprocess'))
+  ##TODO: test all variations of tune vs fixed -- test alpha, e.g.
+  
+  recipe3 <-recipe2  %>%# step_center(week) %>%
+    update_role(c(sin1,sin2,sin3,sin4,sin5,cos1,cos2,cos3,cos4,cos5),new_role='time') %>% 
+    add_role(c(sin1,sin2,sin3,sin4,sin5,cos1,cos2,cos3,cos4,cos5),new_role='predictor')  
+  return(recipe3)
+}
