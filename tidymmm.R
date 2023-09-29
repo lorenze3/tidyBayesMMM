@@ -8,11 +8,17 @@
 setwd('C:\\Users\\loren\\Documents\\R\\tidymmm')
 librarian::shelf(tidymodels,tune,recipes,multilevelmod,tidyverse,arrow,workflowsets,rethinking,rstan)
 
-source('tidymodels methods.R')
-source('mmm functions.R')
+# devtools::install_local('C:\\Users\\loren\\Documents\\R\\mostlytidyMMM',force=T)
+#source('tidymodels methods.R')
+library(mostlytidyMMM)
+source('mmm functions reducing.R')
 
 control_file<-'example model control.xlsx'
+
 #get control spreadsheet
+#var_controls -- must have 1 and only 1 role=time_id record
+#TODO: write function to perform checkcs on control file: 1) 1 outcome 2) role and role 2 assignment checks 3)
+
 var_controls<-readxl::read_xlsx(control_file,'variables')
 transform_controls<-readxl::read_xlsx(control_file,'role controls')
 
@@ -21,25 +27,10 @@ workflow_controls<-readxl::read_xlsx(control_file,"workflow") %>% select(-desc)
 tune_this_time<-get_control('tune_this_time')
 
 #read data and get names right;
-data1<-data.table::fread("example2.csv") %>% mutate(week=as.Date(week,"%m/%d/%Y"))%>% rename_columns_per_controls()
-  
-# read_feather('leads_location_3_product_1_event_3.feather') %>% 
-data1<-data1 %>%   as_tibble()  %>% 
-  mutate(across(c(product),as.factor)) %>% group_by(product,store) %>% arrange(product,store,week) %>% 
-  mutate(day_int=as.numeric(week),
-         cos1=cos(2*pi*day_int/356),
-         cos2=cos(4*pi*day_int/356),
-         cos3 =cos(6*pi*day_int/356),
-         cos4 = cos(8*pi*day_int/356),
-         cos5 = cos(10*pi*day_int/356),
-         sin1=sin(2*pi*day_int/356),
-         sin2=sin(4*pi*day_int/356),
-         sin3=sin(6*pi*day_int/356),
-         sin4=sin(8*pi*day_int/356),
-         sin5=sin(10*pi*day_int/356)) %>% select(-day_int) %>% mutate(store=as.factor(store))
+data1<-data.table::fread("example2.csv") %>% rename_columns_per_controls()%>% mutate(week=as.Date(week,"%m/%d/%Y"))
 
+data1<-add_fourier_vars(data_to_use=data1,vc=var_controls) %>% add_groups_and_sort(vc=var_controls)
 
-#TODO: write function to perform checkcs on control file: 1) 1 outcome 2) role and role 2 assignment checks 3)
 
 recipe3<-create_recipe(data_to_use = data1)#,adding_trend = get_control("add_trend"))
 #build formula to match config file and dataset
@@ -47,7 +38,6 @@ built_formula<-create_formula()
 
 #create bounds based on variable control
 boundaries<-make_bound_statements()
-
 
 formula_list2<-create_ulam_list(prior_controls=var_controls, model_formula=built_formula)
 
@@ -101,9 +91,6 @@ data3<-bake(recipe_finalized ,data1)
 data3 <-data3 %>% ungroup() 
 data3$store_id<-rethinking::coerce_index(data3$store)
 data3<-data3 %>% select(-store,-product)
-
-
-
 
 
 

@@ -124,26 +124,26 @@ asymptote<-function(range=c(0,300)){new_quant_param(type='double',range=range,in
 saturation_speed<-function(range=c(.001,.009)){new_quant_param(type='double',range=range,inclusive=c(FALSE,FALSE),
                                                                label=c(saturation_speed='saturation speed'),finalize = NULL)}
 #test it:
-# mktdata<-rbind(tibble(prod='brand',store='store1',sales=c(100,100,100,100,100),tv=c(10,100,0,0,100),search=c(0,10,20,50,50)) ,
-#                tibble(prod='brand',store='store2',sales=c(10,10,10,10,10),tv=c(0,0,0,0,0),search=c(0,2,2,0,0) ) ) %>% group_by(prod,store) 
-# 
-# mktdata2<-tibble(prod='brand',store='all',sales=100,tv=1000,search=1000) %>% group_by(prod,store)
-# 
-# rec_obj <-
-#  recipe(sales ~ ., data = mktdata) %>%
-#  step_saturation(c(tv,search),asymptote=200,saturation_speed=.003 ) %>%
-#  prep(training = mktdata)
-# 
-# rec_obj2<-  recipe(sales ~ ., data = mktdata) %>%
-#   step_saturation(c(tv,search),asymptote=tune(),saturation_speed=tune() )
-# 
-# extract_parameter_set_dials(rec_obj2)
-# 
-# 
-#  print(rec_obj)
-# 
-#  bake(rec_obj,mktdata)
-#  bake(rec_obj,mktdata2)
+mktdata<-rbind(tibble(prod='brand',store='store1',sales=c(100,100,100,100,100),tv=c(10,100,0,0,100),search=c(0,10,20,50,50)) ,
+               tibble(prod='brand',store='store2',sales=c(10,10,10,10,10),tv=c(0,0,0,0,0),search=c(0,2,2,0,0) ) ) %>% group_by(prod,store)
+
+mktdata2<-tibble(prod='brand',store='all',sales=100,tv=1000,search=1000) %>% group_by(prod,store)
+
+rec_obj <-
+ recipe(sales ~ ., data = mktdata) %>%
+ step_saturation(c(tv,search),asymptote=200,saturation_speed=.003 ) %>%
+ prep(training = mktdata)
+
+rec_obj2<-  recipe(sales ~ ., data = mktdata) %>%
+  step_saturation(c(tv,search),asymptote=tune(),saturation_speed=tune() )
+
+extract_parameter_set_dials(rec_obj2)
+
+
+ print(rec_obj)
+
+bake(rec_obj,mktdata)
+bake(rec_obj,mktdata2)
 
 
 
@@ -276,21 +276,21 @@ retention<-function(range=c(0,.8)){new_quant_param(type='double',range=range,inc
                                                    label=c(retention='retention'),finalize = NULL)}
 
 ##test it:
-# 
-# 
-# mktdata<-rbind(tibble(prod='brand',store='store1',sales=c(100.,100.,100.,100.,100.),tv=c(10.,100.,0.,0.,100),search=c(0,10,20,50.,50.)) ,
-#                tibble(prod='brand',store='store2',sales=c(10.,10,10,10,10),tv=c(0.,0,0,0,0),search=c(0.,2,2,0,0) ) ) %>% group_by(prod,store)
-# 
-# mktdata2<-tibble(prod='brand',store='all',sales=100,tv=1000,search=1000) %>% group_by(prod,store)
-# rec_obj <-  recipe(sales ~ ., data = mktdata) %>% step_adstock(tv,retention=.5,groups=c('prod','store')) %>%
-#   step_adstock(search,retention=.5,groups=c('prod','store')) %>%
-#   prep(training = mktdata)
-# 
-# 
-# print(rec_obj)
-# 
-# bake(rec_obj,mktdata)
-# bake(rec_obj,mktdata2)
+
+
+mktdata<-rbind(tibble(prod='brand',store='store1',sales=c(100.,100.,100.,100.,100.),tv=c(10.,100.,0.,0.,100),search=c(0,10,20,50.,50.)) ,
+               tibble(prod='brand',store='store2',sales=c(10.,10,10,10,10),tv=c(0.,0,0,0,0),search=c(0.,2,2,0,0) ) ) %>% group_by(prod,store)
+
+mktdata2<-tibble(prod='brand',store='all',sales=100,tv=1000,search=1000) %>% group_by(prod,store)
+rec_obj <-  recipe(sales ~ ., data = mktdata) %>% step_adstock(tv,retention=.5,groups=c('prod','store')) %>%
+  step_adstock(search,retention=.5,groups=c('prod','store')) %>%
+  prep(training = mktdata)
+
+
+print(rec_obj)
+
+bake(rec_obj,mktdata)
+bake(rec_obj,mktdata2)
 
 #check to make sure that per-variable application of the step_adstock and step-saturation do not break the grouping structure even though
 #the output tibble from bake is ungrouped (irritatingly)
