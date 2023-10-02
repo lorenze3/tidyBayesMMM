@@ -32,9 +32,7 @@ data1<-data.table::fread("example2.csv") %>%
   rename_columns_per_controls()%>% mutate(week=as.Date(week,"%m/%d/%Y"))
 
 data1<-add_fourier_vars(data_to_use=data1,vc=var_controls) %>% 
-  add_groups_and_sort(vc=var_controls) %>% mutate(store=as.factor(store),
-                                                  product=as.factor(product))
-
+  add_groups_and_sort(vc=var_controls) 
 
 recipe3<-create_recipe(data_to_use = data1)#,adding_trend = get_control("add_trend"))
 #build formula to match config file and dataset
@@ -90,6 +88,11 @@ recipe3 %>% finalize_recipe(use_these_hypers) %>% prep()-> recipe_finalized
 
 data3<-bake(recipe_finalized ,data1)
 
+# raw_data4<-head(data1)
+# raw_data4$store=as.factor("Albany")
+# 
+# data5<-bake(recipe_finalized,raw_data4)
+#  data5$store_id=NULL
 #TODO: setup <var>_id columns for every random int!
 
 data3 <-data3 %>% ungroup() 
@@ -123,7 +126,7 @@ data4<-data3
 
 
 
-pp<-predict(rethinking_results,data4)
+pp<-predict.ulam(rethinking_results,data5)
 
 data4$hat<-pp[,1]  #colMeans(link(rethinking_results,data4)$big_model)
 

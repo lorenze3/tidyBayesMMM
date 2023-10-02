@@ -75,7 +75,12 @@ add_groups_and_sort<-function(data_to_use=data1,vc=var_controls){
   names(groupings)<-NULL
   time_id_var <-vc%>% filter(role=='time_id') %>% select(varname) %>% unlist()
   if(length(groupings)>0){
-    return(data_to_use %>% group_by(across(all_of(groupings))) %>% arrange(across(all_of( c(!!groupings,!!time_id_var)))))
+    
+    data_to_use<-data_to_use%>% 
+      mutate(across(all_of(!!groupings),as.factor))
+    
+    return(data_to_use %>%  group_by(across(all_of(groupings))) %>% 
+             arrange(across(all_of( c(!!groupings,!!time_id_var)))) )
   }
   else{
     return(data_to_use %>% arrange(across(all_of(c(!!time_id_var))) )
@@ -94,8 +99,9 @@ create_recipe<-function(data_to_use=data1,vc=var_controls){
   #   # column_to_change<-data_to_use %>%ungroup() %>%  select(!!trend_vars) %>% unlist() %>% as.numeric()
   #   # data_to_use[trend_vars]<-column_to_change
   # }
+  groupings<-as.character(groups(data_to_use))
   
-  
+  print(groupings)
   recipe0<-recipe(head(data_to_use,n=1) ) 
   
   recipe1<-recipe0 %>% bulk_update_role() %>% bulk_add_role() 
@@ -110,7 +116,9 @@ create_recipe<-function(data_to_use=data1,vc=var_controls){
   
   recipe3 <-recipe2  %>%# step_center(week) %>%
     update_role(c(sin1,sin2,sin3,sin4,sin5,cos1,cos2,cos3,cos4,cos5),new_role='time') %>% 
-    add_role(c(sin1,sin2,sin3,sin4,sin5,cos1,cos2,cos3,cos4,cos5),new_role='predictor')  
+    add_role(c(sin1,sin2,sin3,sin4,sin5,cos1,cos2,cos3,cos4,cos5),new_role='predictor') %>% 
+    step_novel(all_of(!!groupings)) %>% 
+     step_mutate_at(all_of(!!groupings),fn=list(id=as.integer))
   return(recipe3)
 }
 
