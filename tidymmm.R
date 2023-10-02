@@ -1,3 +1,4 @@
+#TODO: re-write decomps function to handle random slopes and intercepts 
 #TODO: figure out what to do about having the tuning or not in a script -- it blocks
 # some of the script flow around lmer preds . .. probably don't need that?
 #TODO: reshape this as an example script
@@ -96,8 +97,8 @@ data3<-bake(recipe_finalized ,data1)
 #TODO: setup <var>_id columns for every random int!
 
 data3 <-data3 %>% ungroup() 
-data3$store_id<-rethinking::coerce_index(data3$store)
-data3<-data3 %>% select(-store,-product)
+# data3$store_id<-rethinking::coerce_index(data3$store)
+# data3<-data3 %>% select(-store,-product)
 
 
 
@@ -126,7 +127,7 @@ data4<-data3
 
 
 
-pp<-predict.ulam(rethinking_results,data5)
+pp<-predict.ulam(rethinking_results,data4)
 
 data4$hat<-pp[,1]  #colMeans(link(rethinking_results,data4)$big_model)
 
