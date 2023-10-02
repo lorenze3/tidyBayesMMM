@@ -1,4 +1,4 @@
-#TODO: re-write decomps function to handle random slopes and intercepts 
+#TODO: re-write decomps function to handle random slopes and intercepts!! 
 #TODO: figure out what to do about having the tuning or not in a script -- it blocks
 # some of the script flow around lmer preds . .. probably don't need that?
 #TODO: reshape this as an example script
@@ -51,7 +51,7 @@ formula_list2<-create_ulam_list(prior_controls=var_controls, model_formula=built
 #                     algorithm = 'sampling',
 #                     prior = if(exists('priors_to_add'))priors_to_add  else NULL)
 
-
+tune_this_time=F
 use_these_hypers<-tune_or_fetch_hyperparameters(tune_this_time,
                                                 saved_parameter_RDS='best_hypers_lmer.RDS',
                                                 recipe_to_use=recipe3,
