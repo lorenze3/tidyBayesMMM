@@ -28,9 +28,12 @@ workflow_controls<-readxl::read_xlsx(control_file,"workflow") %>% select(-desc)
 tune_this_time<-get_control('tune_this_time')
 
 #read data and get names right;
-data1<-data.table::fread("example2.csv") %>% rename_columns_per_controls()%>% mutate(week=as.Date(week,"%m/%d/%Y"))
+data1<-data.table::fread("example2.csv") %>% 
+  rename_columns_per_controls()%>% mutate(week=as.Date(week,"%m/%d/%Y"))
 
-data1<-add_fourier_vars(data_to_use=data1,vc=var_controls) %>% add_groups_and_sort(vc=var_controls)
+data1<-add_fourier_vars(data_to_use=data1,vc=var_controls) %>% 
+  add_groups_and_sort(vc=var_controls) %>% mutate(store=as.factor(store),
+                                                  product=as.factor(product))
 
 
 recipe3<-create_recipe(data_to_use = data1)#,adding_trend = get_control("add_trend"))
@@ -109,8 +112,10 @@ rethinking_results<-ulam(formula_list2,
                messages=F
                )
 
+# reth2<-readRDS('ulam_fit_test.RDS')
+
 # model_text<-if (is.list(rethinking_results)){rethinking_results$model}else{rethinking_results@model}
-# fileConn<-file("ulam stan.stan")
+# fileConn<-file("ulam stan rs.stan")
 # writeLines(model_text, fileConn)
 # close(fileConn)
 
@@ -129,7 +134,6 @@ ggplot(data4 ,aes(x=sales,y=hat,color=store_id))+
   ggtitle("Predicted vs Actual",subtitle="store 170 looks a bit off . . .")
 
 
-decomps<-get_decomps_linear() 
 
 #plot decomp
 fin_pred<-get_predictors_vector(recipe3)
@@ -152,17 +156,16 @@ ggplot(data=decomps_natl,aes(x=week,y=value,fill=name)) + geom_area()+ggthemes::
 ################
 
 
-data1$preds<-data4$hat
 
-natl_plot<-data1  %>% group_by(week) %>% summarise(across(all_of(c('preds','sales','pred_lmer',
-                                                                  !!final_predictors)),
+natl_plot<-data4  %>% group_by(week) %>% summarise(across(all_of(c('hat','sales',
+                                                                  !!fin_pred)),
                                                          sum))
 
-natl_plot_long<-natl_plot %>% select(week,preds,pred_lmer,sales) %>% 
-  pivot_longer(c(preds,sales,pred_lmer),values_to='sales') %>% 
-  mutate(name=ifelse(name=='sales','actual',name))
+natl_plot_long<-natl_plot %>% select(week,hat,sales) %>% 
+  pivot_longer(c(hat,sales),values_to='sales') %>% 
+  mutate(name=ifelse(name=='hat','pred',name))
 # ggplot(data4 %>% filter(leads<2000),aes(x=week,y=leads,group=store_id))+geom_smooth()
-natl_rsq<-round(rsq(natl_plot,truth = sales,estimate=preds)[3],2)
+natl_rsq<-round(rsq(natl_plot,truth = sales,estimate=hat)[3],2)
 
 ggplot(natl_plot_long,aes(x=week,y=sales,color=name))+geom_point() +ggthemes::theme_tufte()+
   ggtitle("Aggregated Leads, LMER Predicted Leads, and Bayesian Multilevel Leads",
