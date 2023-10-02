@@ -4,11 +4,12 @@
 #TODO: put more of the tuning steps inside the if tune this time frame -- make a function?
 #TODO: create response curves from final model results
 
-#suitable for use with bayeisan tuning methods
+
+#devtools::install_local('C:\\Users\\loren\\Documents\\R\\mostlytidyMMM',force=T)
 setwd('C:\\Users\\loren\\Documents\\R\\tidymmm')
 librarian::shelf(tidymodels,tune,recipes,multilevelmod,tidyverse,arrow,workflowsets,rethinking,rstan)
 
-# devtools::install_local('C:\\Users\\loren\\Documents\\R\\mostlytidyMMM',force=T)
+
 #source('tidymodels methods.R')
 library(mostlytidyMMM)
 source('mmm functions reducing.R')
@@ -56,8 +57,8 @@ use_these_hypers<-tune_or_fetch_hyperparameters(tune_this_time,
                                         data_set=data1,control_ranges=transform_controls)
 
 
-fin_rec_3<-recipe3 %>% finalize_recipe(use_these_hypers) %>% prep()
-new_data_to_fake<-bake(fin_rec_3,data1)
+# fin_rec_3<-recipe3 %>% finalize_recipe(use_these_hypers) %>% prep()
+# new_data_to_fake<-bake(fin_rec_3,data1)
 
 
 # data1$pred_lmer<-predict(best_mmm %>% extract_fit_engine(),new_data_to_fake)
@@ -102,7 +103,7 @@ rethinking_results<-ulam(formula_list2,
                sample = T,
                #pars=c('b_week','a0','store_int',paste0('b_',final_predictors),'big_sigma','int_sigma'),
                cmdstan = T,
-               file='ulam_fit_test',
+               file='ulam_fit_test_rs',
                cores=4,
                declare_all_data=F,
                messages=F

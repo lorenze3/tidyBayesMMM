@@ -91,7 +91,7 @@ create_ulam_list<-function(prior_controls=var_controls, model_formula=built_form
   random_slopes0<-all_coefs[grepl("\\|",all_coefs) & !grepl("b_1 \\|",all_coefs)]
    #split into grouping vars and new 'coeff' with coeff name +_interact_<group name>
   random_slope_group_vars<-trimws(sub('.+\\|(.+)', '\\1', random_slopes0))
-  random_slope_idvars<- paste0(random_slope_groupvars,"_id")
+  random_slope_idvars<- paste0(random_slope_group_vars,"_id")
   
   random_slope_real_vars<-paste0(trimws(sub('(.+)\\|.+', '\\1', random_slopes0)),"_interact_",random_slope_group_vars)
   
@@ -104,8 +104,8 @@ create_ulam_list<-function(prior_controls=var_controls, model_formula=built_form
     priors_for_random_slopes=list()
   }
   #get diffuse priors on fixed effects not specified by user
-  fixed_coefs<-all_coefs[!(all_coefs %in% random_ints0)]
-  fixed_terms<-all_terms[!(all_coefs %in% random_ints0)]
+  fixed_coefs<-all_coefs[!(all_coefs %in% random_ints0) & !(all_coefs %in% random_slopes0)]
+  fixed_terms<-all_terms[!(all_coefs %in% random_ints0) & !(all_coefs %in% random_slopes0)]
   
   
   fixed_coefs_needing_priors<-fixed_coefs[!(fixed_coefs %in% names(user_defined_priors))]
@@ -182,7 +182,7 @@ create_ulam_list<-function(prior_controls=var_controls, model_formula=built_form
   #to have expressions in the final list, need to prase the strings in big_modl
   big_model_list_parsed<-sapply(big_model_list,function(x) parse(text=x))
   
-  formula_list<-c(main_model_formula,rev(big_model_list_parsed),priors_for_random_ints,priors_for_fixed,user_defined_priors,prior_on_a0,prior_on_big_sigma,prior_on_store_int_sigma)
+  formula_list<-c(main_model_formula,rev(big_model_list_parsed),priors_for_random_slopes,priors_for_random_ints,priors_for_fixed,user_defined_priors,prior_on_a0,prior_on_big_sigma,prior_on_store_int_sigma)
   
   class(formula_list)<-'list'
   return(formula_list)
