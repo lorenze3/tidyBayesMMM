@@ -1,4 +1,3 @@
-#TODO: re-write decomps function to handle random slopes and intercepts!! 
 #TODO: figure out what to do about having the tuning or not in a script -- it blocks
 # some of the script flow around lmer preds . .. probably don't need that?
 #TODO: reshape this as an example script
@@ -96,11 +95,7 @@ data3<-bake(recipe_finalized ,data1)
 #  data5$store_id=NULL
 #TODO: setup <var>_id columns for every random int!
 
-data3 <-data3 %>% ungroup() 
-# data3$store_id<-rethinking::coerce_index(data3$store)
-# data3<-data3 %>% select(-store,-product)
-
-
+data3 <-data3 
 
 rethinking_results<-ulam(formula_list2,
                chains=4,iter=4000,
@@ -135,7 +130,7 @@ rsq(data4,truth = sales,estimate=hat)
 
 ggplot(data4 ,aes(x=sales,y=hat,color=store_id))+
   geom_point()+ geom_abline(slope=1,intercept=0)+ggthemes::theme_tufte()+
-  ggtitle("Predicted vs Actual",subtitle="store 170 looks a bit off . . .")
+  ggtitle("Predicted vs Actual")
 
 
 
@@ -143,15 +138,16 @@ ggplot(data4 ,aes(x=sales,y=hat,color=store_id))+
 fin_pred<-get_predictors_vector(recipe3)
 names(fin_pred)<-NULL
 
-decomps<-get_decomps_linear() %>%rowwise() %>%  mutate(media=sum(c_across(all_of(fin_pred))))
-decomps$week<-data1$week 
-decomps$sales<-data1$sales
-decomps$base<-decomps$sales-decomps$media
+recipe6<-recipe_finalized %>% step_select(-week)
+
+decomps<-get_decomps_irregardless(data_to_use = data3, recipe_to_use=recipe3) %>% mutate(residual=sales-pred)
+
+#decomps$sales<-data4$sales
 
 
-decomps_natl<-decomps %>% group_by(week) %>% summarise(across(where(is.numeric),sum))
+decomps_natl<-decomps %>% select(week,all_of(!!fin_pred),residual) %>% group_by(week) %>% summarise(across(where(is.numeric),sum))
 
-decomps_natl<-decomps_natl %>% pivot_longer(cols=c(-week,-sales,-media))
+decomps_natl<-decomps_natl %>% pivot_longer(cols=c(-week))
 
 ggplot(data=decomps_natl,aes(x=week,y=value,fill=name)) + geom_area()+ggthemes::theme_tufte()+
   ggtitle("Decomposition By Week")+
