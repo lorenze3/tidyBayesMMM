@@ -113,3 +113,13 @@ for(i in 1:length(all_combinations)){
 }
 list_of_formulae_rands<-append(list_of_formulae_rands,best_formula)
 
+list_of_flows2<-lapply(list_of_formulae_rands,assemble_workflow,hyper_parms_finalized)
+names(list_of_flows2)<-as.character(1:length(list_of_formulae_rands))
+tune_all_these2<-as_workflow_set(!!!list_of_flows2)
+
+rands_selecting_tune<-workflow_map(tune_all_these2,grid=1,resamples=vfold_cv(data1,v=2,strata=combo_id))
+rank_results(rands_selecting_tune)
+id_of_best_rand<-rank_results(rands_selecting_tune,rank_metric="rmse",select_best=T) %>%
+  select(wflow_id) %>% slice_head(n=1) %>% unlist()
+
+best_formula<-list_of_formulae_rands[[as.numeric(id_of_best_rand)]][1]
