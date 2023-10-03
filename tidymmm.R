@@ -36,7 +36,7 @@ data1<-add_fourier_vars(data_to_use=data1,vc=var_controls) %>%
 
 recipe3<-create_recipe(data_to_use = data1)#,adding_trend = get_control("add_trend"))
 #build formula to match config file and dataset
-built_formula<-create_formula()
+
 
 #create bounds based on variable control
 boundaries<-make_bound_statements()
