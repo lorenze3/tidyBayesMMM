@@ -1,7 +1,4 @@
-#model discovery walk through
-#TODO: add the random effects bit to a function
-#TODO: add the hyper pararms  + seasonality part to a funciton
-#TODO: make a function to start a control file from a data table
+
 #devtools::install_local('C:\\Users\\loren\\Documents\\R\\mostlytidyMMM',force=T)
 setwd('C:\\Users\\loren\\Documents\\R\\tidymmm')
 librarian::shelf(tidymodels,tune,recipes,multilevelmod,tidyverse,arrow,workflowsets,rethinking,rstan)
@@ -37,22 +34,21 @@ data1<-data.table::fread("example2.csv") %>%
 data1<-add_fourier_vars(data_to_use=data1,vc=var_controls) %>% 
   add_groups_and_sort(vc=var_controls) 
 
-recipe3<-create_recipe(data_to_use = data1)
-
-#need to create formulas with 0 to fft_terms pairs of sins and cos
-#and with/without interaction
+#
+recipe3<-create_recipe(data_to_use = data1,vc=var_controls,mc=transform_controls,wc=workflow_controls)
 
 
-
+#get list of seasonality specifications to try
 fft_formulae0<-make_list_of_fft_formulae(workflow_controls,recipe3)
+#split the output into two lists, one for formula and one for workflow config tables:
+#list must have names for workflowsets
 formulae<-fft_formulae0[[1]]
-configs_fft_options<-fft_formulae0[[2]]
-
-
-
 names(formulae)<-as.character(1:length(formulae))
 
-list_of_flows<-lapply(formulae,assemble_workflow)
+configs_fft_options<-fft_formulae0[[2]]
+
+#create workflows from each formula, with recipe3 + formula as pre-processor
+list_of_flows<-lapply(formulae,assemble_workflow,recipe3)
 
 tune_all_these<-as_workflow_set(!!!list_of_flows)
 
@@ -63,18 +59,19 @@ fft_selecting_tune<-workflow_map(tune_all_these,grid=25,resamples=vfold_cv(data1
 id_of_best<-rank_results(fft_selecting_tune,rank_metric="rmse",select_best=F) %>%
   select(wflow_id) %>% slice_head(n=1) %>% unlist()
 
-hyper_parms<-select_best(
-  extract_workflow_set_result(fft_selecting_tune,id=id_of_best),metric='rmse')
+if(check_if_needs_tune(recipe3)){
+  hyper_parms<-select_best(
+    extract_workflow_set_result(fft_selecting_tune,id=id_of_best),metric='rmse')
+  hyper_parms_finalized<-recipe3 %>% finalize_recipe(hyper_parms)
+}else{
+  hyper_parms_finalized<-recipe3
+}  
 
 best_seas_vc<-configs_fft_options[[as.numeric(id_of_best)]]
 best_seas_formula<-formulae[[as.numeric(id_of_best)]]
 # autoplot(fft_selecting_tune,metric='rmse')
 
 #let's keep these hyperparms, but try the random effects
-hyper_parms_finalized=recipe3 %>% finalize_recipe(hyper_parms)
-
-
-
 
 
 list_of_formulae_rands<-make_list_of_rands_formula()
